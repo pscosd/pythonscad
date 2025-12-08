@@ -36,18 +36,6 @@
 #include "core/CsgOpNode.h"
 #include "core/ColorNode.h"
 #include "core/ColorUtil.h"
-#include "SourceFile.h"
-#include "BuiltinContext.h"
-#include <PolySetBuilder.h>
-#include "genlang/genlang.h"
-extern bool parse(SourceFile *& file, const std::string& text, const std::string& filename,
-                  const std::string& mainFile, int debug);
-
-#include <python/pydata.h>
-#ifdef ENABLE_LIBFIVE
-#include "python/FrepNode.h"
-#endif
-#include "GeometryUtils.h"
 #include "core/FreetypeRenderer.h"
 #include "core/TransformNode.h"
 #include "core/LinearExtrudeNode.h"
@@ -529,17 +517,16 @@ std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double f
 PyObject *python_sphere(PyObject *self, PyObject *args, PyObject *kwargs)
 {
   DECLARE_INSTANCE();
-  auto node = std::make_shared<SphereNode>(instance, CreateCurveDiscretizer(kwargs));
 
-  char *kwlist[] = {"r", "d", "fn", "fa", "fs", NULL};
+  char *kwlist[] = {"r", "d", NULL};
   double r = NAN;
   PyObject *rp = nullptr;
   double d = NAN;
-  double fn = NAN, fa = NAN, fs = NAN;
 
   double vr = 1;
 
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|Odddd", kwlist, &rp, &d, &fn, &fa, &fs)) {
+  auto discretizer = CreateCurveDiscretizer(kwargs);
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|Od", kwlist, &rp, &d)) {
     PyErr_SetString(PyExc_TypeError, "Error during parsing sphere(r|d)");
     return NULL;
   }
@@ -566,6 +553,8 @@ PyObject *python_sphere(PyObject *self, PyObject *args, PyObject *kwargs)
     vr = d / 2.0;
   }
 
+  auto node = std::make_shared<SphereNode>(instance, discretizer);
+
   node->r = vr;
 
   python_retrieve_pyname(node);
@@ -576,9 +565,9 @@ PyObject *python_cylinder(PyObject *self, PyObject *args, PyObject *kwargs)
 {
   DECLARE_INSTANCE();
 
-  char *kwlist[] = {"h", "r1", "r2", "center", "r", "d", "d1", "d2", "angle", "fn", "fa", "fs", NULL};
-  PyObject *h_ = nullptr;
-  PyObject *r_ = nullptr;
+  char *kwlist[] = {"h", "r1", "r2", "center", "r", "d", "d1", "d2", NULL};
+  double h = NAN;
+  double r = NAN;
   double r1 = NAN;
   double r2 = NAN;
   double d = NAN;
@@ -586,13 +575,12 @@ PyObject *python_cylinder(PyObject *self, PyObject *args, PyObject *kwargs)
   double d2 = NAN;
   double angle = NAN;
 
-  double fn = NAN, fa = NAN, fs = NAN;
-
   PyObject *center = NULL;
   double vr1 = 1, vr2 = 1, vh = 1;
 
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|OddOOddddddd", kwlist, &h_, &r1, &r2, &center, &r_,
-                                   &d, &d1, &d2, &angle, &fn, &fa, &fs)) {
+  auto discretizer = CreateCurveDiscretizer(kwargs);
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|dddOdddd", kwlist, &h, &r1, &r2, &center, &r, &d, &d1,
+                                   &d2)) {
     PyErr_SetString(PyExc_TypeError, "Error during parsing cylinder(h,r|r1+r2|d1+d2)");
     return NULL;
   }
@@ -647,7 +635,7 @@ PyObject *python_cylinder(PyObject *self, PyObject *args, PyObject *kwargs)
     vr2 = d / 2.0;
   }
 
-  if (!isnan(angle)) node->angle = angle;
+  auto node = std::make_shared<CylinderNode>(instance, discretizer);
 
   node->r1 = vr1;
   node->r2 = vr2;
@@ -878,15 +866,14 @@ PyObject *python_circle(PyObject *self, PyObject *args, PyObject *kwargs)
 {
   DECLARE_INSTANCE();
 
-  char *kwlist[] = {"r", "d", "angle", "fn", "fa", "fs", NULL};
+  char *kwlist[] = {"r", "d", NULL};
   double r = NAN;
   double d = NAN;
-  double angle = NAN;
-  double fn = NAN, fa = NAN, fs = NAN;
 
   double vr = 1;
 
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|dddddd", kwlist, &r, &d, &angle, &fn, &fa, &fs)) {
+  auto discretizer = CreateCurveDiscretizer(kwargs);
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|ddddd", kwlist, &r, &d)) {
     PyErr_SetString(PyExc_TypeError, "Error during parsing circle(r|d)");
     return NULL;
   }
@@ -910,9 +897,7 @@ PyObject *python_circle(PyObject *self, PyObject *args, PyObject *kwargs)
     vr = d / 2.0;
   }
 
-  auto node = std::make_shared<CircleNode>(instance, CreateCurveDiscretizer(kwargs));
-
-  if (!isnan(angle)) node->angle = angle;
+  auto node = std::make_shared<CircleNode>(instance, discretizer);
 
   node->r = vr;
 
@@ -3233,15 +3218,7 @@ PyObject *rotate_extrude_core(PyObject *obj, int convexity, double scale, double
   DECLARE_INSTANCE();
   std::shared_ptr<AbstractNode> child;
   auto node = std::make_shared<RotateExtrudeNode>(instance, discretizer);
-  PyTypeObject *type = &PyOpenSCADType;
-  node->profile_func = NULL;
-  node->twist_func = NULL;
-  if (obj->ob_type == &PyFunction_Type) {
-    Py_XINCREF(obj);  // TODO there to decref it ?
-    node->profile_func = obj;
-    auto dummy_node = std::make_shared<SquareNode>(instance);
-    node->children.push_back(dummy_node);
-  } else {
+  if (1) {
     PyObject *dummydict;
     type = PyOpenSCADObjectType(obj);
     child = PyOpenSCADObjectToNodeMulti(obj, &dummydict);
@@ -3296,16 +3273,16 @@ PyObject *python_rotate_extrude(PyObject *self, PyObject *args, PyObject *kwargs
   char *method = NULL;
   PyObject *origin = NULL;
   PyObject *offset = NULL;
-  double fn = NAN, fa = NAN, fs = NAN;
-  char *kwlist[] = {"obj", "convexity", "scale", "angle", "twist", "origin", "offset",
-                    "v",   "method",    "fn",    "fa",    "fs",    NULL};
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|iddOOOOsddd", kwlist, &obj, &convexity, &scale,
-                                   &angle, &twist, &origin, &offset, &v, &method, &fn, &fa, &fs)) {
+  char *kwlist[] = {"obj",    "convexity", "scale", "angle",  "twist",
+                    "origin", "offset",    "v",     "method", NULL};
+  auto discretizer = CreateCurveDiscretizer(kwargs);
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|iddOOOOs", kwlist, &obj, &convexity, &scale, &angle,
+                                   &twist, &origin, &offset, &v, &method)) {
     PyErr_SetString(PyExc_TypeError, "Error during parsing rotate_extrude(object,...)");
     return NULL;
   }
   return rotate_extrude_core(obj, convexity, scale, angle, twist, origin, offset, v, method,
-                             CreateCurveDiscretizer(kwargs));
+                             std::move(discretizer));
 }
 
 PyObject *python_oo_rotate_extrude(PyObject *obj, PyObject *args, PyObject *kwargs)
@@ -3316,18 +3293,17 @@ PyObject *python_oo_rotate_extrude(PyObject *obj, PyObject *args, PyObject *kwar
   PyObject *twist = NULL;
   PyObject *origin = NULL;
   PyObject *offset = NULL;
-  double fn = NAN, fa = NAN, fs = NAN;
   PyObject *v = NULL;
   char *method = NULL;
-  char *kwlist[] = {"convexity", "scale",  "angle", "twist", "origin", "offset",
-                    "v",         "method", "fn",    "fa",    "fs",     NULL};
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|iddOOOOsddd", kwlist, &convexity, &scale, &angle,
-                                   &twist, &origin, &offset, &v, &method, &fn, &fa, &fs)) {
+  char *kwlist[] = {"convexity", "scale", "angle", "twist", "origin", "offset", "v", "method", NULL};
+  auto discretizer = CreateCurveDiscretizer(kwargs);
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|iddOOOOs", kwlist, &convexity, &scale, &angle, &twist,
+                                   &origin, &offset, &v, &method)) {
     PyErr_SetString(PyExc_TypeError, "error during parsing\n");
     return NULL;
   }
   return rotate_extrude_core(obj, convexity, scale, angle, twist, origin, offset, v, method,
-                             CreateCurveDiscretizer(kwargs));
+                             std::move(discretizer));
 }
 
 PyObject *linear_extrude_core(PyObject *obj, PyObject *height, int convexity, PyObject *origin,
@@ -3337,15 +3313,8 @@ PyObject *linear_extrude_core(PyObject *obj, PyObject *height, int convexity, Py
   DECLARE_INSTANCE();
   std::shared_ptr<AbstractNode> child;
   auto node = std::make_shared<LinearExtrudeNode>(instance, discretizer);
-  PyTypeObject *type = &PyOpenSCADType;
-  node->profile_func = NULL;
-  node->twist_func = NULL;
-  if (obj->ob_type == &PyFunction_Type) {
-    Py_XINCREF(obj);  // TODO there to decref it ?
-    node->profile_func = obj;
-    auto dummy_node = std::make_shared<SquareNode>(instance);
-    node->children.push_back(dummy_node);
-  } else {
+
+  if (1) {
     PyObject *dummydict;
     type = PyOpenSCADObjectType(obj);
     child = PyOpenSCADObjectToNodeMulti(obj, &dummydict);
@@ -3421,6 +3390,7 @@ PyObject *python_linear_extrude(PyObject *self, PyObject *args, PyObject *kwargs
 
   char *kwlist[] = {"obj",    "height", "convexity", "origin", "scale",
                     "center", "slices", "segments",  "twist",  NULL};
+  auto discretizer = CreateCurveDiscretizer(kwargs);
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|OiOOOiiO", kwlist, &obj, &height, &convexity,
                                    &origin, &scale, &center, &slices, &segments, &twist)) {
     PyErr_SetString(PyExc_TypeError, "error during parsing\n");
@@ -3428,7 +3398,7 @@ PyObject *python_linear_extrude(PyObject *self, PyObject *args, PyObject *kwargs
   }
 
   return linear_extrude_core(obj, height, convexity, origin, scale, center, slices, segments, twist,
-                             CreateCurveDiscretizer(kwargs));
+                             std::move(discretizer));
 }
 
 PyObject *python_oo_linear_extrude(PyObject *obj, PyObject *args, PyObject *kwargs)
@@ -3444,6 +3414,7 @@ PyObject *python_oo_linear_extrude(PyObject *obj, PyObject *args, PyObject *kwar
 
   char *kwlist[] = {"height", "convexity", "origin", "scale", "center",
                     "slices", "segments",  "twist",  NULL};
+  auto discretizer = CreateCurveDiscretizer(kwargs);
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|OiOOOiiO", kwlist, &height, &convexity, &origin,
                                    &scale, &center, &slices, &segments, &twist)) {
     PyErr_SetString(PyExc_TypeError, "error during parsing\n");
@@ -3451,129 +3422,10 @@ PyObject *python_oo_linear_extrude(PyObject *obj, PyObject *args, PyObject *kwar
   }
 
   return linear_extrude_core(obj, height, convexity, origin, scale, center, slices, segments, twist,
-                             CreateCurveDiscretizer(kwargs));
+                             std::move(discretizer));
 }
 
-PyObject *path_extrude_core(PyObject *obj, PyObject *path, PyObject *xdir, int convexity,
-                            PyObject *origin, PyObject *scale, PyObject *twist, PyObject *closed,
-                            PyObject *allow_intersect, double fn, double fa, double fs)
-{
-  DECLARE_INSTANCE();
-  std::shared_ptr<AbstractNode> child;
-  auto node = std::make_shared<PathExtrudeNode>(instance);
-  PyTypeObject *type = &PyOpenSCADType;
-  node->profile_func = NULL;
-  node->twist_func = NULL;
-  if (obj->ob_type == &PyFunction_Type) {
-    Py_XINCREF(obj);  // TODO there to decref it ?
-    node->profile_func = obj;
-    auto dummy_node = std::make_shared<SquareNode>(instance);
-    node->children.push_back(dummy_node);
-  } else {
-    PyObject *dummydict;
-    type = PyOpenSCADObjectType(obj);
-    child = PyOpenSCADObjectToNodeMulti(obj, &dummydict);
-    if (child == NULL) {
-      PyErr_SetString(PyExc_TypeError, "Invalid type for  Object in path_extrude\n");
-      return NULL;
-    }
-    node->children.push_back(child);
-  }
-  if (path != NULL && PyList_Check(path)) {
-    int n = PyList_Size(path);
-    for (int i = 0; i < n; i++) {
-      PyObject *point = PyList_GetItem(path, i);
-      double x, y, z, w = 0;
-      if (python_vectorval(point, 3, 4, &x, &y, &z, &w)) {
-        PyErr_SetString(PyExc_TypeError, "Cannot parse vector in path_extrude path\n");
-        return NULL;
-      }
-      Vector4d pt3d(x, y, z, w);
-      if (i > 0 && node->path[i - 1] == pt3d) continue;  //  prevent double pts
-      node->path.push_back(pt3d);
-    }
-  }
-  node->xdir_x = 1;
-  node->xdir_y = 0;
-  node->xdir_z = 0;
-  node->closed = false;
-  if (closed == Py_True) node->closed = true;
-  if (allow_intersect == Py_True) node->allow_intersect = true;
-  if (xdir != NULL) {
-    if (python_vectorval(xdir, 3, 3, &(node->xdir_x), &(node->xdir_y), &(node->xdir_z))) {
-      PyErr_SetString(PyExc_TypeError, "error in path_extrude xdir parameter\n");
-      return NULL;
-    }
-  }
-  if (fabs(node->xdir_x) < 0.001 && fabs(node->xdir_y) < 0.001 && fabs(node->xdir_z) < 0.001) {
-    PyErr_SetString(PyExc_TypeError, "error in path_extrude xdir parameter has zero size\n");
-    return NULL;
-  }
-
-  node->convexity = convexity;
-
-  node->origin_x = 0.0;
-  node->origin_y = 0.0;
-  if (origin != NULL) {
-    double dummy;
-    if (python_vectorval(origin, 2, 2, &(node->origin_x), &(node->origin_y), &dummy)) {
-      PyErr_SetString(PyExc_TypeError, "error in path_extrude origin parameter\n");
-      return NULL;
-    }
-  }
-
-  node->scale_x = 1.0;
-  node->scale_y = 1.0;
-  if (scale != NULL) {
-    double dummy;
-    if (python_vectorval(scale, 2, 2, &(node->scale_x), &(node->scale_y), &dummy)) {
-      PyErr_SetString(PyExc_TypeError, "error in path_extrude scale parameter\n");
-      return NULL;
-    }
-  }
-
-  if (scale != NULL && PyList_Check(scale) && PyList_Size(scale) == 2) {
-    node->scale_x = PyFloat_AsDouble(PyList_GetItem(scale, 0));
-    node->scale_y = PyFloat_AsDouble(PyList_GetItem(scale, 1));
-  }
-  if (twist != NULL) {
-    if (twist->ob_type == &PyFunction_Type) {
-      Py_XINCREF(twist);  // TODO there to decref it ?
-      node->twist_func = twist;
-    } else node->twist = PyFloat_AsDouble(twist);
-    node->has_twist = 1;
-  } else node->has_twist = 0;
-
-  return PyOpenSCADObjectFromNode(type, node);
-}
-
-PyObject *python_path_extrude(PyObject *self, PyObject *args, PyObject *kwargs)
-{
-  PyObject *obj = NULL;
-  int convexity = 1;
-  PyObject *origin = NULL;
-  PyObject *scale = NULL;
-  PyObject *path = NULL;
-  PyObject *xdir = NULL;
-  PyObject *closed = NULL;
-  PyObject *allow_intersect = NULL;
-  PyObject *twist = NULL;
-  double fn = -1, fa = -1, fs = -1;
-
-  char *kwlist[] = {"obj",   "path",   "xdir", "convexity", "origin", "scale",
-                    "twist", "closed", "fn",   "fa",        "fs",     NULL};
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OO!|O!iOOOOOddd", kwlist, &obj, &PyList_Type, &path,
-                                   &PyList_Type, &xdir, &convexity, &origin, &scale, &twist, &closed,
-                                   &allow_intersect, &fn, &fs, &fs)) {
-    PyErr_SetString(PyExc_TypeError, "error during parsing\n");
-    return NULL;
-  }
-
-  return path_extrude_core(obj, path, xdir, convexity, origin, scale, twist, closed, allow_intersect, fn,
-                           fa, fs);
-}
-
-PyObject *python_concat(PyObject *self, PyObject *args, PyObject *kwargs)
+PyObject *python_csg_sub(PyObject *self, PyObject *args, PyObject *kwargs, OpenSCADOperator mode)
 {
   DECLARE_INSTANCE();
   int i;
@@ -3933,8 +3785,8 @@ PyObject *python_oo_intersection(PyObject *self, PyObject *args, PyObject *kwarg
 PyObject *python_nb_sub(PyObject *arg1, PyObject *arg2, OpenSCADOperator mode)
 {
   DECLARE_INSTANCE();
-  std::vector<std::shared_ptr<AbstractNode>> child;
-  std::vector<PyObject *> child_dict;
+  std::shared_ptr<AbstractNode> child[2];
+  PyObject *child_dict[2];
 
   if (arg1 == Py_None && mode == OpenSCADOperator::UNION) return arg2;
   if (arg2 == Py_None && mode == OpenSCADOperator::UNION) return arg1;
@@ -4355,11 +4207,12 @@ PyObject *python_roof(PyObject *self, PyObject *args, PyObject *kwargs)
   PyObject *obj = NULL;
   const char *method = NULL;
   int convexity = 2;
+  auto discretizer = CreateCurveDiscretizer(kwargs);
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|sd", kwlist, &obj, &method, convexity)) {
     PyErr_SetString(PyExc_TypeError, "Error during parsing roof(object)");
     return NULL;
   }
-  return python_roof_core(obj, method, convexity, CreateCurveDiscretizer(kwargs));
+  return python_roof_core(obj, method, convexity, std::move(discretizer));
 }
 
 PyObject *python_oo_roof(PyObject *obj, PyObject *args, PyObject *kwargs)
@@ -4368,11 +4221,12 @@ PyObject *python_oo_roof(PyObject *obj, PyObject *args, PyObject *kwargs)
   char *kwlist[] = {"method", "convexity", NULL};
   const char *method = NULL;
   int convexity = 2;
+  auto discretizer = CreateCurveDiscretizer(kwargs);
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|sd", kwlist, &method, convexity)) {
     PyErr_SetString(PyExc_TypeError, "Error during parsing roof(object)");
     return NULL;
   }
-  return python_roof_core(obj, method, convexity, CreateCurveDiscretizer(kwargs));
+  return python_roof_core(obj, method, convexity, std::move(discretizer));
 }
 #endif
 
@@ -4764,6 +4618,14 @@ std::optional<std::string> to_optional_string(const char *ptr)
   return {};
 }
 
+std::optional<std::string> to_optional_string(const char *ptr)
+{
+  if (ptr != nullptr) {
+    return std::string(ptr);
+  }
+  return {};
+}
+
 PyObject *python_text(PyObject *self, PyObject *args, PyObject *kwargs)
 {
   DECLARE_INSTANCE();
@@ -4775,6 +4637,7 @@ PyObject *python_text(PyObject *self, PyObject *args, PyObject *kwargs)
   const char *text = "", *font = NULL, *direction = "ltr", *language = "en", *script = "latin",
              *valign = "baseline", *halign = "left";
 
+  auto discretizer = CreateCurveDiscretizer(kwargs);
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|dsdsssss", kwlist, &text, &size, &font, &spacing,
                                    &direction, &language, &script, &halign, &valign)) {
     PyErr_SetString(PyExc_TypeError, "Error during parsing text(string, ...))");
@@ -4783,7 +4646,7 @@ PyObject *python_text(PyObject *self, PyObject *args, PyObject *kwargs)
 
   auto node = std::make_shared<TextNode>(
     instance, FreetypeRenderer::Params(FreetypeRenderer::Params::ParamsOptions{
-                .curve_discretizer = std::make_shared<CurveDiscretizer>(CreateCurveDiscretizer(kwargs)),
+                .curve_discretizer = std::make_shared<CurveDiscretizer>(discretizer),
                 .size = size,
                 .spacing = spacing,
                 .text = to_optional_string(text),
@@ -4864,41 +4727,6 @@ PyObject *python_textmetrics(PyObject *self, PyObject *args, PyObject *kwargs)
   return (PyObject *)dict;
 }
 
-PyObject *python_osversion(PyObject *self, PyObject *args, PyObject *kwargs)
-{
-  char *kwlist[] = {NULL};
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "", kwlist)) {
-    PyErr_SetString(PyExc_TypeError, "Error during parsing version()");
-    return NULL;
-  }
-
-  PyObject *version = PyList_New(3);
-  PyList_SetItem(version, 0, PyFloat_FromDouble(OPENSCAD_YEAR));
-  PyList_SetItem(version, 1, PyFloat_FromDouble(OPENSCAD_MONTH));
-#ifdef OPENSCAD_DAY
-  PyList_SetItem(version, 2, PyFloat_FromDouble(OPENSCAD_DAY));
-#else
-  PyList_SetItem(version, 2, PyFloat_FromDouble(0));
-#endif
-
-  return version;
-}
-
-PyObject *python_osversion_num(PyObject *self, PyObject *args, PyObject *kwargs)
-{
-  char *kwlist[] = {NULL};
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "", kwlist)) {
-    PyErr_SetString(PyExc_TypeError, "Error during parsing version_num()");
-    return NULL;
-  }
-
-  double version = OPENSCAD_YEAR * 10000 + OPENSCAD_MONTH * 100;
-#ifdef OPENSCAD_DAY
-  version += OPENSCAD_DAY;
-#endif
-  return PyFloat_FromDouble(version);
-}
-
 PyObject *python_offset_core(PyObject *obj, double r, double delta, PyObject *chamfer,
                              CurveDiscretizer&& discretizer)
 {
@@ -4940,11 +4768,12 @@ PyObject *python_offset(PyObject *self, PyObject *args, PyObject *kwargs)
   PyObject *obj = NULL;
   double r = NAN, delta = NAN;
   PyObject *chamfer = NULL;
+  auto discretizer = CreateCurveDiscretizer(kwargs);
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|ddO", kwlist, &obj, &r, &delta, &chamfer)) {
     PyErr_SetString(PyExc_TypeError, "Error during parsing offset(object,r,delta)");
     return NULL;
   }
-  return python_offset_core(obj, r, delta, chamfer, CreateCurveDiscretizer(kwargs));
+  return python_offset_core(obj, r, delta, chamfer, std::move(discretizer));
 }
 
 PyObject *python_oo_offset(PyObject *obj, PyObject *args, PyObject *kwargs)
@@ -4952,11 +4781,12 @@ PyObject *python_oo_offset(PyObject *obj, PyObject *args, PyObject *kwargs)
   char *kwlist[] = {"r", "delta", "chamfer", NULL};
   double r = NAN, delta = NAN;
   PyObject *chamfer = NULL;
+  auto discretizer = CreateCurveDiscretizer(kwargs);
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|ddO", kwlist, &r, &delta, &chamfer)) {
     PyErr_SetString(PyExc_TypeError, "Error during parsing offset(object,r,delta)");
     return NULL;
   }
-  return python_offset_core(obj, r, delta, chamfer, CreateCurveDiscretizer(kwargs));
+  return python_offset_core(obj, r, delta, chamfer, std::move(discretizer));
 }
 
 PyObject *python_projection_core(PyObject *obj, PyObject *cut, int convexity)

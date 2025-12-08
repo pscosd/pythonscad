@@ -14,11 +14,10 @@
  *   If you reversed l1b and l1e, it'll be sqrt(6).
  *   And if l1e was (-4,1,1), it's 1.0.
  *   This value is always clamped to [0,length(l1)], for better or worse.
- * @return SelectedObject The shortest (Euclidean) distance from the point pt to the line segment [l1a,
- * l1e].
+ * @return double The shortest (Euclidean) distance from the point pt to the line segment [l1a, l1e].
  */
-SelectedObject calculateLinePointDistance(const Vector3d& l1b, const Vector3d& l1e, const Vector3d& pt,
-                                          double& dist_lat);
+double calculateLinePointDistance(const Vector3d& l1b, const Vector3d& l1e, const Vector3d& pt,
+                                  double& dist_lat);
 
 /**
  * @brief Calculates the signed shortest distance between two infinite 3D lines.
@@ -59,11 +58,8 @@ double calculateLineLineDistance(const Vector3d& l1b, const Vector3d& l1e, const
  * @param l1e The ending point of the first line segment.
  * @param l2b The beginning point of the second line segment.
  * @param l2e The ending point of the second line segment.
- * @return SelectedObject The **unsigned magnitude** of the shortest distance vector
+ * @return double The **unsigned magnitude** of the shortest distance vector
  * between the two segments. Returns NaN if the linear system cannot be solved.
  */
-SelectedObject calculateSegSegDistance(const Vector3d& l1b, const Vector3d& l1e, const Vector3d& l2b,
-                                       const Vector3d& l2e);
-
-SelectedObject calculatePointFaceDistance(const Vector3d& pt, const Vector3d& p1, const Vector3d& p2,
-                                          const Vector3d& p3);
+double calculateSegSegDistance(const Vector3d& l1b, const Vector3d& l1e, const Vector3d& l2b,
+                               const Vector3d& l2e);

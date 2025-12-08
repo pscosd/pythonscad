@@ -11,6 +11,11 @@
 
 class CurveDiscretizer;
 
+#define DECLARE_INSTANCE()     \
+  std::string instance_name;   \
+  AssignmentList inst_asslist; \
+  ModuleInstantiation *instance = new ModuleInstantiation(instance_name, inst_asslist, Location::NONE)
+
 typedef struct {
   PyObject_HEAD std::shared_ptr<AbstractNode> node;
   PyObject *dict;
@@ -51,14 +56,13 @@ Value python_functionfunc(const FunctionCall *call, const std::shared_ptr<const 
 int python_vectorval(PyObject *vec, int minarg, int maxarg, double *x, double *y, double *z,
                      double *w = NULL, int *flags = nullptr);
 std::vector<Vector3d> python_vectors(PyObject *vec, int mindim, int maxdim, int *dragflags);
-int python_numberval(PyObject *number, double *result, int *flags = nullptr, int flagor = 0);
+int python_numberval(PyObject *number, double *result);
 void get_fnas(double& fn, double& fa, double& fs);
 void python_retrieve_pyname(const std::shared_ptr<AbstractNode>& node);
 void python_build_hashmap(const std::shared_ptr<AbstractNode>& node, int level);
 PyObject *python_fromopenscad(const Value& val);
 
 extern SourceFile *osinclude_source;
-
 CurveDiscretizer CreateCurveDiscretizer(PyObject *kwargs);
 PyObject *python_str(PyObject *self);
 

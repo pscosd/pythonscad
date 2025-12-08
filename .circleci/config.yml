@@ -2,7 +2,6 @@ version: 2.1
 
 orbs:
   macos: circleci/macos@2.5.1
-
 executors:
   mxe64-executor:
     working_directory: ~/workspace
@@ -51,7 +50,6 @@ commands:
               else
                   OPENSCAD_VERSION="${BASE_VERSION}"
               fi
-
               echo "export OPENSCAD_COMMIT=$OPENSCAD_COMMIT" >> $BASH_ENV
               echo "export OPENSCAD_VERSION=$OPENSCAD_VERSION" >> $BASH_ENV
   get_source:
@@ -95,7 +93,6 @@ jobs:
               export PKG_CONFIG_PATH=/mxe/usr/x86_64-w64-mingw32.static.posix/lib/pkgconfig
               ln -sf /usr/bin/python{3,}
               if [ x"${CIRCLE_BRANCH}" = xmaster ]; then export SUFFIX=""; else export SUFFIX="_$(echo ${CIRCLE_BRANCH} | sed -e 's,pull/,PR,; s,/head,h,; s,/merge,m,; s,/,.,g')"; fi
-
               ./scripts/release-common.sh snapshot mingw64 -v "$OPENSCAD_VERSION" -c "$OPENSCAD_COMMIT"
               mkdir -p /tmp/out
               for f in mingw*/*.zip mingw*/*.exe; do N=$(basename "$f" | sed -e "s/\\(-x86-[36][24]\\)/\\1${SUFFIX}/;"); cp -iv "$f" /tmp/out/"$N"; done
@@ -166,23 +163,6 @@ jobs:
         type: string
     steps:
       - checkout
-      - when:
-          condition:
-            equal: [ web, << parameters.wasm-type >> ]
-          steps:
-            - run:
-                name: Install Puppeteer
-                command: |
-                    apt-get update
-                    apt-get install -y \
-                        libatk1.0-0 libatk-bridge2.0-0 libdrm2 libxcomposite1 libxdamage1 \
-                        libxfixes3 libxrandr2 libgbm1 libxkbcommon0 libpango-1.0-0 libcairo2
-                    npm i -g n
-                    n latest
-                    export PATH="/usr/local/bin:$PATH"
-                    npm init -y
-                    npm i puppeteer
-                    npx puppeteer browsers install chrome
       - run:
           name: Install latest node.js
           command: |
@@ -317,7 +297,6 @@ jobs:
             security -v set-key-partition-list -S apple-tool:,apple: -s -k "" OpenSCAD.keychain
             codesign --options=runtime --keychain OpenSCAD.keychain -s "Marius Kintel" --force --deep build/OpenSCAD.app
 
-            hdiutil create -volname "OpenSCAD" -srcfolder build/OpenSCAD.app -ov -format UDZO "OpenSCAD-$OPENSCAD_VERSION.dmg"
             codesign --keychain OpenSCAD.keychain -s "Marius Kintel" --force OpenSCAD-$OPENSCAD_VERSION.dmg
 
             xcrun notarytool submit OpenSCAD-$OPENSCAD_VERSION.dmg --wait --apple-id $APPLE_NOTARIZATION_ACCOUNT --team-id $APPLE_NOTARIZATION_TEAM --password $APPLE_NOTARIZATION_PASSWORD
