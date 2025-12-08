@@ -235,7 +235,6 @@ void help_export(const std::array<const Settings::SettingsEntryBase *, size>& op
 
 void help_export()
 {
-  LOG("PythonSCAD version %1$s\n", openscad_versionnumber);
   LOG("List of settings that can be given using the -O option using the");
   LOG("format '<section>/<key>=value', e.g.:");
   LOG("openscad -O export-pdf/paper-size=a6 -O export-pdf/show-grid=false\n");
@@ -245,11 +244,7 @@ void help_export()
   exit(0);
 }
 
-void version()
-{
-  LOG("PythonSCAD version %1$s", openscad_versionnumber);
-  exit(0);
-}
+void version() { exit(0); }
 
 int info()
 {

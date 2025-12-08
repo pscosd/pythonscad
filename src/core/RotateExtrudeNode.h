@@ -18,6 +18,8 @@ class CurveDiscretizer;
 
 class CurveDiscretizer;
 
+class CurveDiscretizer;
+
 class RotateExtrudeNode : public AbstractPolyNode
 {
 public:
@@ -35,6 +37,7 @@ public:
   std::string name() const override { return "rotate_extrude"; }
 
   int convexity;
+  CurveDiscretizer discretizer;
   double angle = 360, start = 0, origin_x = 0, origin_y = 0, scale = 1, offset_x = 0, offset_y = 0;
   double twist = 0;
   std::string method;
@@ -43,5 +46,4 @@ public:
   void *profile_func;
   void *twist_func;
 #endif
-  CurveDiscretizer discretizer;
 };

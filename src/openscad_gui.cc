@@ -175,11 +175,6 @@ int gui(std::vector<std::string>& inputFiles, const std::filesystem::path& origi
   QIcon::setThemeName(isDarkMode() ? "chokusen-dark" : "chokusen");
 
   // set up groups for QSettings
-  QCoreApplication::setOrganizationName("PythonSCAD");
-  QCoreApplication::setOrganizationDomain("pythonscad.org");
-  QCoreApplication::setApplicationName("PythonSCAD");
-  QCoreApplication::setApplicationVersion(QString::fromStdString(std::string(openscad_versionnumber)));
-  QGuiApplication::setApplicationDisplayName("PythonSCAD");
   QGuiApplication::setDesktopFileName(DESKTOP_FILENAME);
 #if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
   QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);

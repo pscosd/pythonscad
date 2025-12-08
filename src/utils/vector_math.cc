@@ -1,4 +1,3 @@
-#include "core/Selection.h"
 #include "utils/vector_math.h"
 #include "geometry/Grid.h"
 
@@ -33,18 +32,14 @@ bool linsystem(Vector3d v1, Vector3d v2, Vector3d v3, Vector3d pt, Vector3d& res
   return false;
 }
 
-SelectedObject calculateLinePointDistance(const Vector3d& l1, const Vector3d& l2, const Vector3d& pt,
-                                          double& dist_lat)
+double calculateLinePointDistance(const Vector3d& l1b, const Vector3d& l1e, const Vector3d& pt,
+                                  double& dist_lat)
 {
-  SelectedObject ruler;
-  ruler.type = SelectionType::SELECTION_SEGMENT;
-  Vector3d d = (l2 - l1);
+  Vector3d d = (l1e - l1b);
   double l = d.norm();
   d.normalize();
-  dist_lat = std::clamp((pt - l1).dot(d), 0.0, l);
-  ruler.pt.push_back(l1 + d * dist_lat);
-  ruler.pt.push_back(pt);
-  return ruler;
+  dist_lat = std::clamp((pt - l1b).dot(d), 0.0, l);
+  return (l1b + d * dist_lat - pt).norm();
 }
 
 double calculateLineLineDistance(const Vector3d& l1b, const Vector3d& l1e, const Vector3d& l2b,
@@ -69,7 +64,7 @@ double calculateLineLineDistance(const Vector3d& l1b, const Vector3d& l1e, const
       // Leave parametric_t as NaN because it's meaningless.
       double dummy;
       auto ret = calculateLinePointDistance(l2b, l2e, l1b, dummy);
-      return (ret.pt[0] = ret.pt[1]).norm();
+      return ret;
     }
     // This handles line 2 being a point or line:
     return dist_numerator / v1_norm;
@@ -80,40 +75,27 @@ double calculateLineLineDistance(const Vector3d& l1b, const Vector3d& l1e, const
   return d;
 }
 
-SelectedObject calculateSegSegDistance(const Vector3d& l1b, const Vector3d& l1e, const Vector3d& l2b,
-                                       const Vector3d& l2e)
+double calculateSegSegDistance(const Vector3d& l1b, const Vector3d& l1e, const Vector3d& l2b,
+                               const Vector3d& l2e)
 {
-  SelectedObject ruler;
-  ruler.type = SelectionType::SELECTION_SEGMENT;
-
+  double d;
   Vector3d v1 = l1e - l1b;
   Vector3d v2 = l2e - l2b;
   Vector3d n = v1.cross(v2);
   Vector3d res;
-  if (n.norm() < 1e-6) {
-    double dummy;
-    return calculateLinePointDistance(l1b, l1e, l2b, dummy);
+  // This applies both when segments are parallel, but also when the segments are collinear.
+  // For the latter case in particular, not checking the correct endpoint yields the wrong answer.
+  // There might be a smarter solution, but checking both works.
+  if (n.norm() < GRID_FINE) {
+    double ret1 = calculateLinePointDistance(l1b, l1e, l2b, d),
+           ret2 = calculateLinePointDistance(l1b, l1e, l2e, d);
+    if (std::isnan(ret1)) return ret2;
+    if (std::isnan(ret2)) return ret1;
+    return std::min(ret1, ret2);
   }
-  if (linsystem(v1, n, v2, l2e - l1b, res, nullptr)) {
-    ruler.type = SelectionType::SELECTION_INVALID;
-    return ruler;
-  }
+  if (linsystem(v1, n, v2, l2e - l1b, res, nullptr)) return NAN;
   double d1 = std::clamp(res[0], 0.0, 1.0);
   double d2 = std::clamp(res[2], 0.0, 1.0);
-  ruler.pt.push_back(l1b + v1 * d1);
-  ruler.pt.push_back(l2e - v2 * d2);
-
-  return ruler;
-}
-
-SelectedObject calculatePointFaceDistance(const Vector3d& pt, const Vector3d& p1, const Vector3d& p2,
-                                          const Vector3d& p3)
-{
-  SelectedObject ruler;
-  ruler.type = SelectionType::SELECTION_SEGMENT;
-  ruler.pt.push_back(pt);
-  Vector3d n = (p2 - p1).cross(p3 - p1).normalized();
-  double dist = fabs((pt - p1).dot(n));
-  ruler.pt.push_back(pt + n * dist);
-  return ruler;
+  Vector3d dist = (l2e - v2 * d2) - (l1b + v1 * d1);
+  return dist.norm();
 }

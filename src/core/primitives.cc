@@ -231,7 +231,7 @@ std::unique_ptr<const Geometry> SphereNode::createGeometry() const
     return PolySet::createEmpty();
   }
 
-  int num_fragments = discretizer.getCircularSegmentCount(r, 360.0).value_or(3);
+  int num_fragments = discretizer.getCircularSegmentCount(r).value_or(3);
 #ifdef ENABLE_PYTHON
   if (this->r_func != nullptr) {
     double fs = discretizer.getMinimalEdgeLength();
